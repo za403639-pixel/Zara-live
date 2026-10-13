@@ -1,0 +1,11 @@
+{
+  "name": "Zara Live",
+  "description": "Live streaming app featuring real-time chat, interactive gifts, multi-platform streaming, and an 8-guest + 1-host seat interactive room.",
+  "requestFramePermissions": [
+    "android.permission.CAMERA",
+    "android.permission.RECORD_AUDIO"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

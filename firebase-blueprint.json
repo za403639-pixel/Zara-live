@@ -1,0 +1,72 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile and streaming identity on Zara Live",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "User ID matching Firebase Auth UID"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the user"
+        },
+        "streamerHandle": {
+          "type": "string",
+          "description": "Unique handle/username for streaming"
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short creator bio"
+        },
+        "avatarUrl": {
+          "type": "string",
+          "description": "Profile picture URL"
+        },
+        "coinBalance": {
+          "type": "integer",
+          "description": "User wallet coin balance"
+        },
+        "diamondsEarned": {
+          "type": "integer",
+          "description": "Diamonds earned from viewer gifts"
+        },
+        "followerCount": {
+          "type": "integer",
+          "description": "Number of followers"
+        },
+        "isVerified": {
+          "type": "boolean",
+          "description": "Verified creator status"
+        },
+        "twitchStreamKey": {
+          "type": "string",
+          "description": "User Twitch stream key"
+        },
+        "youtubeStreamKey": {
+          "type": "string",
+          "description": "User YouTube stream key"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of profile creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update"
+        }
+      },
+      "required": ["userId", "displayName", "streamerHandle", "coinBalance", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Stores user profile and streaming identity indexed by Firebase Auth UID"
+    }
+  }
+}
