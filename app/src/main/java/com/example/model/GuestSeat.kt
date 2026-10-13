@@ -15,6 +15,18 @@ data class GuestSeat(
     val isCurrentUser: Boolean = false
 )
 
+data class JoinStreamRequest(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val userId: String = "",
+    val userName: String = "",
+    val userAvatar: String = "",
+    val requestedSeatNumber: Int? = null, // null = Any available seat
+    val timestamp: Long = System.currentTimeMillis(),
+    val videoRequested: Boolean = true,
+    val audioRequested: Boolean = true,
+    val note: String = "Ready to stream live! 🎙️"
+)
+
 data class GuestRoom(
     val roomId: String = "zara-room-888",
     val title: String = "Zara Live: VIP Talk Show & Music Cypher",
@@ -23,5 +35,6 @@ data class GuestRoom(
     val topic: String = "Multi-Guest Voice & Video Stage (8 Seats)",
     val listenersCount: Int = 4120,
     val isRecording: Boolean = true,
-    val activeSoundEffect: String? = null
+    val activeSoundEffect: String? = null,
+    val pendingJoinRequests: List<JoinStreamRequest> = emptyList()
 )

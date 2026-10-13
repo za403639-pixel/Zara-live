@@ -52,7 +52,9 @@ data class ZaraLiveUiState(
     val isCurrentUserInGuestSeat: Boolean = false,
     val currentUserSeatIndex: Int? = null,
     val soundEffectAlert: String? = null,
-    val isProfileSyncing: Boolean = false
+    val isProfileSyncing: Boolean = false,
+    val hasPendingJoinRequest: Boolean = false,
+    val seatActionNotice: String? = null
 )
 
 class ZaraLiveViewModel(
@@ -405,6 +407,248 @@ class ZaraLiveViewModel(
             }
             current.copy(guestRoom = current.guestRoom.copy(guestSeats = updatedSeats))
         }
+    }
+
+    fun requestToJoinStream(
+        requestedSeat: Int? = null,
+        videoOn: Boolean = true,
+        audioOn: Boolean = true,
+        note: String = "Ready to stream live! 🎙️"
+    ) {
+        val current = _uiState.value
+        val profile = current.currentUserProfile
+
+        val newRequest = JoinStreamRequest(
+            userId = profile.userId.ifEmpty { "current_user_${System.currentTimeMillis()}" },
+            userName = profile.username,
+            userAvatar = profile.avatar,
+            requestedSeatNumber = requestedSeat,
+            timestamp = System.currentTimeMillis(),
+            videoRequested = videoOn,
+            audioRequested = audioOn,
+            note = note
+        )
+
+        val updatedRequests = current.guestRoom.pendingJoinRequests + newRequest
+        _uiState.update {
+            it.copy(
+                guestRoom = it.guestRoom.copy(pendingJoinRequests = updatedRequests),
+                hasPendingJoinRequest = true,
+                seatActionNotice = if (requestedSeat != null) "Join request submitted for Seat #$requestedSeat ⏳" else "Join request submitted! Waiting for host... ⏳"
+            )
+        }
+    }
+
+    fun cancelJoinRequest() {
+        val current = _uiState.value
+        val profile = current.currentUserProfile
+        val updatedRequests = current.guestRoom.pendingJoinRequests.filterNot {
+            it.userName == profile.username || it.userId == profile.userId
+        }
+        _uiState.update {
+            it.copy(
+                guestRoom = it.guestRoom.copy(pendingJoinRequests = updatedRequests),
+                hasPendingJoinRequest = false,
+                seatActionNotice = "Join request cancelled"
+            )
+        }
+    }
+
+    fun approveJoinRequest(requestId: String, targetSeatNumber: Int? = null) {
+        val current = _uiState.value
+        val req = current.guestRoom.pendingJoinRequests.find { it.id == requestId } ?: return
+
+        // Determine destination seat:
+        // Priority: explicitly specified targetSeatNumber -> requestedSeatNumber (if available) -> first unoccupied seat
+        val unoccupied = current.guestRoom.guestSeats.filter { !it.isOccupied }
+        val seatToAssign = when {
+            targetSeatNumber != null && unoccupied.any { it.seatNumber == targetSeatNumber } -> targetSeatNumber
+            req.requestedSeatNumber != null && unoccupied.any { it.seatNumber == req.requestedSeatNumber } -> req.requestedSeatNumber
+            unoccupied.isNotEmpty() -> unoccupied.first().seatNumber
+            else -> null
+        }
+
+        if (seatToAssign == null) {
+            _uiState.update { it.copy(seatActionNotice = "Cannot approve: All 8 guest seats are currently occupied!") }
+            return
+        }
+
+        val isSelf = req.userName == current.currentUserProfile.username || req.userId == current.currentUserProfile.userId
+
+        val updatedSeats = current.guestRoom.guestSeats.map { seat ->
+            if (seat.seatNumber == seatToAssign) {
+                seat.copy(
+                    isOccupied = true,
+                    userName = req.userName,
+                    userAvatar = req.userAvatar,
+                    roleTitle = "Guest #$seatToAssign",
+                    isMuted = !req.audioRequested,
+                    isTalking = false,
+                    videoOn = req.videoRequested,
+                    isCurrentUser = isSelf
+                )
+            } else {
+                seat
+            }
+        }
+
+        val remainingRequests = current.guestRoom.pendingJoinRequests.filterNot { it.id == requestId }
+
+        _uiState.update {
+            it.copy(
+                guestRoom = it.guestRoom.copy(
+                    guestSeats = updatedSeats,
+                    pendingJoinRequests = remainingRequests
+                ),
+                isCurrentUserInGuestSeat = if (isSelf) true else it.isCurrentUserInGuestSeat,
+                currentUserSeatIndex = if (isSelf) seatToAssign else it.currentUserSeatIndex,
+                hasPendingJoinRequest = if (isSelf) false else it.hasPendingJoinRequest,
+                seatActionNotice = "Assigned ${req.userName} to Seat #$seatToAssign 🎉"
+            )
+        }
+    }
+
+    fun declineJoinRequest(requestId: String) {
+        val current = _uiState.value
+        val req = current.guestRoom.pendingJoinRequests.find { it.id == requestId }
+        val remaining = current.guestRoom.pendingJoinRequests.filterNot { it.id == requestId }
+        val isSelf = req?.userName == current.currentUserProfile.username || req?.userId == current.currentUserProfile.userId
+
+        _uiState.update {
+            it.copy(
+                guestRoom = it.guestRoom.copy(pendingJoinRequests = remaining),
+                hasPendingJoinRequest = if (isSelf) false else it.hasPendingJoinRequest,
+                seatActionNotice = "Declined request from ${req?.userName ?: "user"}"
+            )
+        }
+    }
+
+    fun assignGuestToSeat(
+        targetSeatNumber: Int,
+        userName: String,
+        userAvatar: String,
+        videoOn: Boolean = true,
+        isMuted: Boolean = false
+    ) {
+        val current = _uiState.value
+        val isSelf = userName == current.currentUserProfile.username
+
+        val updatedSeats = current.guestRoom.guestSeats.map { seat ->
+            if (seat.seatNumber == targetSeatNumber) {
+                seat.copy(
+                    isOccupied = true,
+                    userName = userName,
+                    userAvatar = userAvatar,
+                    roleTitle = "Guest #$targetSeatNumber",
+                    isMuted = isMuted,
+                    isTalking = false,
+                    videoOn = videoOn,
+                    isCurrentUser = isSelf
+                )
+            } else {
+                seat
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                guestRoom = it.guestRoom.copy(guestSeats = updatedSeats),
+                isCurrentUserInGuestSeat = if (isSelf) true else it.isCurrentUserInGuestSeat,
+                currentUserSeatIndex = if (isSelf) targetSeatNumber else it.currentUserSeatIndex,
+                seatActionNotice = "Assigned $userName to Seat #$targetSeatNumber"
+            )
+        }
+    }
+
+    fun kickGuestFromSeat(seatNumber: Int) {
+        val current = _uiState.value
+        val seatToClear = current.guestRoom.guestSeats.find { it.seatNumber == seatNumber }
+        val wasSelf = seatToClear?.isCurrentUser == true
+
+        val updatedSeats = current.guestRoom.guestSeats.map { seat ->
+            if (seat.seatNumber == seatNumber) {
+                seat.copy(
+                    isOccupied = false,
+                    userName = "",
+                    userAvatar = "",
+                    roleTitle = "Guest #${seat.seatNumber} (Available)",
+                    isCurrentUser = false,
+                    isMuted = true,
+                    isTalking = false,
+                    videoOn = false,
+                    isHandRaised = false
+                )
+            } else {
+                seat
+            }
+        }
+
+        _uiState.update {
+            it.copy(
+                guestRoom = it.guestRoom.copy(guestSeats = updatedSeats),
+                isCurrentUserInGuestSeat = if (wasSelf) false else it.isCurrentUserInGuestSeat,
+                currentUserSeatIndex = if (wasSelf) null else it.currentUserSeatIndex,
+                seatActionNotice = "Seat #$seatNumber vacated"
+            )
+        }
+    }
+
+    fun reassignGuestSeat(fromSeatNumber: Int, toSeatNumber: Int) {
+        val current = _uiState.value
+        val sourceSeat = current.guestRoom.guestSeats.find { it.seatNumber == fromSeatNumber } ?: return
+        val destSeat = current.guestRoom.guestSeats.find { it.seatNumber == toSeatNumber } ?: return
+
+        if (!sourceSeat.isOccupied || destSeat.isOccupied) {
+            _uiState.update { it.copy(seatActionNotice = "Cannot move to an occupied seat!") }
+            return
+        }
+
+        val updatedSeats = current.guestRoom.guestSeats.map { seat ->
+            when (seat.seatNumber) {
+                fromSeatNumber -> seat.copy(
+                    isOccupied = false,
+                    userName = "",
+                    userAvatar = "",
+                    roleTitle = "Guest #$fromSeatNumber (Available)",
+                    isCurrentUser = false,
+                    isMuted = true,
+                    isTalking = false,
+                    videoOn = false
+                )
+                toSeatNumber -> sourceSeat.copy(
+                    seatNumber = toSeatNumber,
+                    roleTitle = "Guest #$toSeatNumber"
+                )
+                else -> seat
+            }
+        }
+
+        val wasSelf = sourceSeat.isCurrentUser
+
+        _uiState.update {
+            it.copy(
+                guestRoom = it.guestRoom.copy(guestSeats = updatedSeats),
+                currentUserSeatIndex = if (wasSelf) toSeatNumber else it.currentUserSeatIndex,
+                seatActionNotice = "Moved ${sourceSeat.userName} from Seat #$fromSeatNumber to Seat #$toSeatNumber"
+            )
+        }
+    }
+
+    fun toggleRaiseHand(seatNumber: Int) {
+        _uiState.update { current ->
+            val updatedSeats = current.guestRoom.guestSeats.map { seat ->
+                if (seat.seatNumber == seatNumber) {
+                    seat.copy(isHandRaised = !seat.isHandRaised)
+                } else {
+                    seat
+                }
+            }
+            current.copy(guestRoom = current.guestRoom.copy(guestSeats = updatedSeats))
+        }
+    }
+
+    fun clearSeatNotice() {
+        _uiState.update { it.copy(seatActionNotice = null) }
     }
 
     fun triggerSoundEffect(effectName: String) {

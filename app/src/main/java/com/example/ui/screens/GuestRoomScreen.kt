@@ -35,6 +35,7 @@ import com.example.ui.components.FloatingReactionsContainer
 import com.example.ui.components.GiftTrayBottomSheet
 import com.example.ui.components.HostControlPanelOverlay
 import com.example.ui.components.LiveChatOverlay
+import com.example.ui.components.StreamSeatGridComponent
 import com.example.ui.theme.*
 import com.example.viewmodel.ZaraLiveUiState
 import com.example.viewmodel.ZaraLiveViewModel
@@ -186,129 +187,83 @@ fun GuestRoomScreen(
                     }
                 }
 
-                if (layoutMode == StageLayoutMode.SPOTLIGHT_1_PLUS_8) {
-                    // ==========================================
-                    // 1 MAIN HOST WINDOW (Large Hero Spotlight)
-                    // ==========================================
-                    MainHostVideoWindow(
-                        hostSeat = guestRoom.hostSeat,
-                        isMuted = uiState.broadcastSettings.isMicMuted,
-                        isFrontCamera = uiState.broadcastSettings.isFrontCamera,
-                        isBroadcasting = uiState.isBroadcasting,
-                        isTorchOn = uiState.broadcastSettings.isTorchOn,
-                        onToggleMute = { viewModel.toggleBroadcastMic() },
-                        onCameraSwap = { viewModel.flipCamera() },
-                        onStopStream = { viewModel.toggleBroadcasting() },
-                        onToggleTorch = { viewModel.toggleTorch() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(210.dp),
-                        onHostClick = { selectedSeatForAction = guestRoom.hostSeat }
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Header for Guest Slots
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "GUEST VIDEO SLOTS (8 SLOTS)",
-                                color = ZaraTextSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            val occupiedCount = guestRoom.guestSeats.count { it.isOccupied }
-                            Text(
-                                text = "($occupiedCount/8 active)",
-                                color = ZaraCyan,
-                                fontSize = 11.sp
-                            )
-                        }
-
-                        Text(
-                            text = if (uiState.isCurrentUserInGuestSeat) "You are on Slot #${uiState.currentUserSeatIndex}" else "Tap empty slot to join video",
-                            color = if (uiState.isCurrentUserInGuestSeat) ZaraGreenLive else ZaraPurple,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // ==========================================
-                    // 8 SMALLER GUEST SLOTS (2 rows x 4 columns)
-                    // ==========================================
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(180.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        items(guestRoom.guestSeats, key = { it.seatNumber }) { seat ->
-                            GuestVideoSlotTile(
-                                seat = seat,
-                                isCurrentUser = seat.isCurrentUser,
-                                onSlotClick = {
-                                    if (!seat.isOccupied) {
-                                        viewModel.takeGuestSeat(seat.seatNumber)
-                                    } else {
-                                        selectedSeatForAction = seat
-                                    }
+                // Seat Action Notice Banner
+                AnimatedVisibility(
+                    visible = uiState.seatActionNotice != null,
+                    enter = slideInVertically() + fadeIn(),
+                    exit = slideOutVertically() + fadeOut()
+                ) {
+                    uiState.seatActionNotice?.let { notice ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(ZaraCyan.copy(alpha = 0.9f))
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "✨ $notice",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = { viewModel.clearSeatNotice() },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Dismiss",
+                                        tint = Color.Black,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
-                            )
-                        }
-                    }
-                } else {
-                    // ==========================================
-                    // EQUAL SQUAD 9-TILE VIDEO GRID (3x3)
-                    // ==========================================
-                    Text(
-                        text = "SQUAD GRID MODE (1 HOST + 8 GUEST VIDEO SLOTS)",
-                        color = ZaraTextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
-
-                    val all9Seats = listOf(guestRoom.hostSeat) + guestRoom.guestSeats
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(350.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        items(all9Seats, key = { if (it.isHost) 0 else it.seatNumber }) { seat ->
-                            if (seat.isHost) {
-                                HostVideoTile(
-                                    hostSeat = seat,
-                                    onHostClick = { selectedSeatForAction = seat }
-                                )
-                            } else {
-                                GuestVideoSlotTile(
-                                    seat = seat,
-                                    isCurrentUser = seat.isCurrentUser,
-                                    onSlotClick = {
-                                        if (!seat.isOccupied) {
-                                            viewModel.takeGuestSeat(seat.seatNumber)
-                                        } else {
-                                            selectedSeatForAction = seat
-                                        }
-                                    }
-                                )
                             }
                         }
                     }
                 }
+
+                // =============================================================
+                // REUSABLE 8-GUEST + 1-HOST STREAM SEAT GRID COMPONENT
+                // =============================================================
+                StreamSeatGridComponent(
+                    guestRoom = guestRoom,
+                    isCurrentUserInSeat = uiState.isCurrentUserInGuestSeat,
+                    currentUserSeatIndex = uiState.currentUserSeatIndex,
+                    hasPendingRequest = uiState.hasPendingJoinRequest,
+                    isBroadcasting = uiState.isBroadcasting,
+                    broadcastMicMuted = uiState.broadcastSettings.isMicMuted,
+                    broadcastFrontCamera = uiState.broadcastSettings.isFrontCamera,
+                    broadcastTorchOn = uiState.broadcastSettings.isTorchOn,
+                    onToggleBroadcastMic = { viewModel.toggleBroadcastMic() },
+                    onCameraSwap = { viewModel.flipCamera() },
+                    onStopStream = { viewModel.toggleBroadcasting() },
+                    onToggleTorch = { viewModel.toggleTorch() },
+                    onRequestToJoin = { seat, video, audio, note ->
+                        viewModel.requestToJoinStream(seat, video, audio, note)
+                    },
+                    onCancelJoinRequest = { viewModel.cancelJoinRequest() },
+                    onApproveRequest = { reqId, targetSeat ->
+                        viewModel.approveJoinRequest(reqId, targetSeat)
+                    },
+                    onDeclineRequest = { reqId ->
+                        viewModel.declineJoinRequest(reqId)
+                    },
+                    onLeaveSeat = { viewModel.leaveGuestSeat() },
+                    onToggleSeatMic = { viewModel.toggleSeatMic(it) },
+                    onToggleSeatVideo = { viewModel.toggleSeatVideo(it) },
+                    onKickGuest = { viewModel.kickGuestFromSeat(it) },
+                    onReassignSeat = { from, to -> viewModel.reassignGuestSeat(from, to) },
+                    onOpenGiftTrayForSeat = { showGiftTray = true }
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 

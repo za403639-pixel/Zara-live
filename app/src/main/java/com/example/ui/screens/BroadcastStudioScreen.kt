@@ -33,6 +33,7 @@ import com.example.camera.CameraPreviewView
 import com.example.model.BroadcastStatus
 import com.example.model.MultiStreamDestination
 import com.example.model.StreamPlatform
+import com.example.ui.components.StreamSeatGridComponent
 import com.example.ui.theme.*
 import com.example.viewmodel.ZaraLiveUiState
 import com.example.viewmodel.ZaraLiveViewModel
@@ -158,12 +159,17 @@ fun BroadcastStudioScreen(
                 Tab(
                     selected = activeTab == 0,
                     onClick = { activeTab = 0 },
-                    text = { Text("Camera & Live Preview 📹", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }
+                    text = { Text("Camera Live 📹", fontWeight = FontWeight.SemiBold, fontSize = 11.sp) }
                 )
                 Tab(
                     selected = activeTab == 1,
                     onClick = { activeTab = 1 },
-                    text = { Text("Multi-Stream Targets 🌐", fontWeight = FontWeight.SemiBold, fontSize = 12.sp) }
+                    text = { Text("8+1 Guest Stage 🎙️", fontWeight = FontWeight.SemiBold, fontSize = 11.sp) }
+                )
+                Tab(
+                    selected = activeTab == 2,
+                    onClick = { activeTab = 2 },
+                    text = { Text("Multi-Stream 🌐", fontWeight = FontWeight.SemiBold, fontSize = 11.sp) }
                 )
             }
 
@@ -342,6 +348,70 @@ fun BroadcastStudioScreen(
                             }
                         }
                     }
+                }
+            } else if (activeTab == 1) {
+                // 8-Guest + 1-Host Interactive Stage View & Join Requests Management
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    AnimatedVisibility(
+                        visible = uiState.seatActionNotice != null,
+                        enter = slideInVertically() + fadeIn(),
+                        exit = slideOutVertically() + fadeOut()
+                    ) {
+                        uiState.seatActionNotice?.let { notice ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(ZaraCyan.copy(alpha = 0.9f))
+                                    .padding(8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "✨ $notice",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+
+                    StreamSeatGridComponent(
+                        guestRoom = uiState.guestRoom,
+                        isCurrentUserInSeat = uiState.isCurrentUserInGuestSeat,
+                        currentUserSeatIndex = uiState.currentUserSeatIndex,
+                        hasPendingRequest = uiState.hasPendingJoinRequest,
+                        isBroadcasting = uiState.isBroadcasting,
+                        broadcastMicMuted = uiState.broadcastSettings.isMicMuted,
+                        broadcastFrontCamera = uiState.broadcastSettings.isFrontCamera,
+                        broadcastTorchOn = uiState.broadcastSettings.isTorchOn,
+                        onToggleBroadcastMic = { viewModel.toggleBroadcastMic() },
+                        onCameraSwap = { viewModel.flipCamera() },
+                        onStopStream = { viewModel.toggleBroadcasting() },
+                        onToggleTorch = { viewModel.toggleTorch() },
+                        onRequestToJoin = { seat, v, a, note ->
+                            viewModel.requestToJoinStream(seat, v, a, note)
+                        },
+                        onCancelJoinRequest = { viewModel.cancelJoinRequest() },
+                        onApproveRequest = { reqId, targetSeat ->
+                            viewModel.approveJoinRequest(reqId, targetSeat)
+                        },
+                        onDeclineRequest = { reqId ->
+                            viewModel.declineJoinRequest(reqId)
+                        },
+                        onLeaveSeat = { viewModel.leaveGuestSeat() },
+                        onToggleSeatMic = { viewModel.toggleSeatMic(it) },
+                        onToggleSeatVideo = { viewModel.toggleSeatVideo(it) },
+                        onKickGuest = { viewModel.kickGuestFromSeat(it) },
+                        onReassignSeat = { from, to -> viewModel.reassignGuestSeat(from, to) },
+                        onOpenGiftTrayForSeat = { }
+                    )
                 }
             } else {
                 // Multi-Stream Targets Configuration

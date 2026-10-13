@@ -194,6 +194,31 @@ object SampleData {
             )
         )
 
+        val sampleJoinRequests = listOf(
+            JoinStreamRequest(
+                id = "req_1",
+                userId = "user_elena",
+                userName = "Elena_Singer",
+                userAvatar = "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+                requestedSeatNumber = 5,
+                timestamp = System.currentTimeMillis() - 45000,
+                videoRequested = true,
+                audioRequested = true,
+                note = "I have my acoustic guitar ready for the cypher! 🎸"
+            ),
+            JoinStreamRequest(
+                id = "req_2",
+                userId = "user_tarik",
+                userName = "Tarik_ProGamer",
+                userAvatar = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+                requestedSeatNumber = null,
+                timestamp = System.currentTimeMillis() - 20000,
+                videoRequested = true,
+                audioRequested = true,
+                note = "Ready to discuss the grand finals clutch! 🎮"
+            )
+        )
+
         return GuestRoom(
             roomId = "room_zara_prime",
             title = "🔥 Zara 8-Seat VIP Voice & Video Cypher Stage",
@@ -201,7 +226,8 @@ object SampleData {
             guestSeats = guestSeats,
             topic = "Live Gaming & Music Debate - Open 8 Seats",
             listenersCount = 8412,
-            isRecording = true
+            isRecording = true,
+            pendingJoinRequests = sampleJoinRequests
         )
     }
 

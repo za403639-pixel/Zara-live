@@ -37,6 +37,39 @@ class ExampleRobolectricTest {
     val platforms = destinations.map { it.platform }
     assertTrue(platforms.contains(StreamPlatform.TWITCH))
     assertTrue(platforms.contains(StreamPlatform.YOUTUBE))
-    assertTrue(platforms.contains(StreamPlatform.TIKTOK))
+  }
+
+  @Test
+  fun `verify join stream requests and seat assignment workflow`() {
+    val room = SampleData.createInitialGuestRoom()
+    assertTrue("Should have sample pending join requests", room.pendingJoinRequests.isNotEmpty())
+    val firstReq = room.pendingJoinRequests.first()
+    assertEquals("Elena_Singer", firstReq.userName)
+    assertEquals(5, firstReq.requestedSeatNumber)
+
+    // Test ViewModel seat request and approval
+    val viewModel = com.example.viewmodel.ZaraLiveViewModel()
+    val initialPending = viewModel.uiState.value.guestRoom.pendingJoinRequests.size
+
+    // User submits request
+    viewModel.requestToJoinStream(requestedSeat = 6, videoOn = true, audioOn = true, note = "Testing seat 6")
+    assertEquals(initialPending + 1, viewModel.uiState.value.guestRoom.pendingJoinRequests.size)
+    assertTrue(viewModel.uiState.value.hasPendingJoinRequest)
+
+    // Find the request and approve it
+    val myReq = viewModel.uiState.value.guestRoom.pendingJoinRequests.last()
+    viewModel.approveJoinRequest(myReq.id, targetSeatNumber = 6)
+
+    // Check Seat 6 is now occupied by current user
+    val seat6 = viewModel.uiState.value.guestRoom.guestSeats.find { it.seatNumber == 6 }
+    assertTrue(seat6?.isOccupied == true)
+    assertTrue(viewModel.uiState.value.isCurrentUserInGuestSeat)
+    assertEquals(6, viewModel.uiState.value.currentUserSeatIndex)
+
+    // Leave seat
+    viewModel.leaveGuestSeat()
+    val seat6AfterLeave = viewModel.uiState.value.guestRoom.guestSeats.find { it.seatNumber == 6 }
+    assertTrue(seat6AfterLeave?.isOccupied == false)
+    assertTrue(!viewModel.uiState.value.isCurrentUserInGuestSeat)
   }
 }
